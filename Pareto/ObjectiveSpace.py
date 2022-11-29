@@ -56,6 +56,14 @@ class ObjectivesSpace:
 #        value = hypervolume([np.array(x)]).compute(r)
 #        return value
 
+    def _min_max(self, X):
+        M = X.copy()
+        max = M.max(axis=0)
+        min = M.min(axis=0)
+        M = (M - min) / (max - min)
+        return M
+
+
     def _compute_hypervolume(self, x, r):
         x = x[list(self.functions.keys())]
         ind = HV(ref_point=r)
@@ -72,9 +80,11 @@ class ObjectivesSpace:
             not_dominated.apply(lambda x: self._compute_hypervolume(x, r), axis=1)
         return not_dominated
 
-    def knee_point(self):
+    def knee_point(self, scale=False):
         factors = np.array(list(map(lambda x: 1 if x == 'max' else -1, list(self.functions.values()))))
         kp_pts = np.copy(self.points[0])
+        if scale:
+            kp_pts[:, 1:] = self._min_max(kp_pts[:, 1:])
         kp_pts[:, 1:] = kp_pts[:, 1:] * factors
         counter = np.zeros(kp_pts[:, 1:].shape[0])
         for i in range(100):
@@ -86,8 +96,10 @@ class ObjectivesSpace:
         # print(counter)
         return pd.DataFrame(np.column_stack((kp_pts, counter)), columns=columns)
 
-    def euclidean_distance(self, up):
+    def euclidean_distance(self, up, scale=False):
         ed_points = np.copy(self.points[0])
+        if scale:
+            ed_points[:, 1:] = self._min_max(ed_points[:, 1:])
         ed_points[:, 1:] = (ed_points[:, 1:] - up) ** 2
         distances = ed_points[:, 1:].sum(axis=1) ** (1 / 2)
         # np.append(not_dominated, distances, axis=1)
@@ -95,9 +107,11 @@ class ObjectivesSpace:
         columns.append('euclidean_distance')
         return pd.DataFrame(np.column_stack((ed_points, distances)), columns=columns)
 
-    def weighted_mean(self, w):
+    def weighted_mean(self, w, scale=False):
         factors = np.array(list(map(lambda x: 1 if x == 'max' else -1, list(self.functions.values()))))
         wm_points = np.copy(self.points[0])
+        if scale:
+            wm_points[:, 1:] = self._min_max(wm_points[:, 1:])
         wm_points[:, 1:] = wm_points[:, 1:] * factors
         wm_points[:, 1:] = wm_points[:, 1:] * w
         sum = wm_points[:, 1:].sum(axis=1) / wm_points[:, 1:].shape[1]
@@ -117,11 +131,9 @@ class ObjectivesSpace:
         df = pd.read_csv(relative_path + '/' + model_per_user, sep='\t')
         M = df[list(self.functions.keys())].values
         if scale:
-            max = M.max(axis=0)
-            min = M.min(axis=0)
-            M = (M - min) / (max - min)
+            M = self._min_max(M)
         M = (up - M) ** 2
-        M = M.sum(axis=1) ** (1 / 2)
+        M = M.sum(axis=1) #  ** (1 / 2)
         # print(M.sum())
         return M.sum()
 
