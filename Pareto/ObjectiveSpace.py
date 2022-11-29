@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from pygmo import hypervolume
+# from pygmo import hypervolume
+from pymoo.indicators.hv import HV
 import os
 
 np.random.seed(7)
@@ -50,10 +51,16 @@ class ObjectivesSpace:
     def get_dominated(self):
         return pd.DataFrame(self.points[1], columns=self._constr_obj())
 
+#    def _compute_hypervolume(self, x, r):
+#        x = x[list(self.functions.keys())]
+#        value = hypervolume([np.array(x)]).compute(r)
+#        return value
+
     def _compute_hypervolume(self, x, r):
         x = x[list(self.functions.keys())]
-        value = hypervolume([np.array(x)]).compute(r)
-        return value
+        ind = HV(ref_point=r)
+        # value = hypervolume([np.array(x)]).compute(r)
+        return ind(np.array(x))
 
     def hypervolumes(self, r):
         factors = np.array(list(map(lambda x: -1 if x == 'max' else 1, list(self.functions.values()))))
@@ -98,7 +105,7 @@ class ObjectivesSpace:
         columns.append('weighted_mean')
         return pd.DataFrame(np.column_stack((wm_points, sum)), columns=columns)
 
-    def _compute_distances(self, model, up):
+    def _compute_distances(self, model, up, scale):
         relative_path = 'data/population'
         dir = os.listdir(relative_path)
         for el in dir:
@@ -109,6 +116,10 @@ class ObjectivesSpace:
                 model_per_user = ''
         df = pd.read_csv(relative_path + '/' + model_per_user, sep='\t')
         M = df[list(self.functions.keys())].values
+        if scale:
+            max = M.max(axis=0)
+            min = M.min(axis=0)
+            M = (M - min) / (max - min)
         M = (up - M) ** 2
         M = M.sum(axis=1) ** (1 / 2)
         # print(M.sum())
@@ -139,9 +150,9 @@ class ObjectivesSpace:
         print(variance, np.log(1 / (((2 * np.pi) ** (1 / 2)) * standard_deviation)), (1 / (2 * variance)) * M.sum())
         return M.shape[0] * np.log(1 / (((2 * np.pi) ** (1 / 2)) * standard_deviation)) - (1 / (2 * variance)) * M.sum()
 
-    def nome_framework(self, up):
+    def nome_framework(self, up, scale=False):
         not_dominated = pd.DataFrame(self.points[0], columns=self._constr_obj())
-        not_dominated['nostro_framework'] = not_dominated['model'].map(lambda x: self._compute_distances(x, up))
+        not_dominated['nostro_framework'] = not_dominated['model'].map(lambda x: self._compute_distances(x, up, scale))
         return not_dominated
 
     def nome_framework_v2(self, up):
