@@ -86,7 +86,7 @@ class ObjectivesSpace:
         if scale:
             kp_pts[:, 1:] = self._min_max(kp_pts[:, 1:])
         kp_pts[:, 1:] = kp_pts[:, 1:] * factors
-        counter = np.zeros(kp_pts[:, 1:].shape[0])
+        counter = np.zeros(kp_pts[:, 1:].shape[0], dtype=np.int8)
         for i in range(100):
             w = np.random.uniform(low=0, high=1, size=kp_pts[:, 1:].shape)
             w = w / w.sum()
@@ -129,13 +129,16 @@ class ObjectivesSpace:
             else:
                 model_per_user = ''
         df = pd.read_csv(relative_path + '/' + model_per_user, sep='\t')
+        df = pd.merge(df, up, on=['User'])
         M = df[list(self.functions.keys())].values
+        up = df[[s + '_up' for s in list(self.functions.keys())]].values
         if scale:
             M = self._min_max(M)
+            print(M)
         M = (up - M) ** 2
         M = M.sum(axis=1) #  ** (1 / 2)
         # print(M.sum())
-        return M.sum()
+        return np.log(M.sum())
 
     def _variance(self, distances):
         mean = distances.mean()
